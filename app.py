@@ -5,13 +5,11 @@ from flask import Flask, request, Response
 import requests
 
 # ---------------------
-# Flask App Setup
+# Flask Setup
 # ---------------------
 app = Flask(__name__)
 
-# ---------------------
 # Logging
-# ---------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -23,21 +21,61 @@ VERIFY_TOKEN = "123darcscar"
 FB_GRAPH = "https://graph.facebook.com/v19.0"
 
 # ---------------------
+# Config
+# ---------------------
+FOODPANDA_URL = "https://www.foodpanda.ph/restaurant/locg/pedros-old-manila-rd"
+PHONE_NUMBER = "0424215968"
+
+# ---------------------
 # Helpers
 # ---------------------
-def send_text_message(psid, message):
-    """Send a simple text message to the user"""
+def send_vertical_menu(psid):
+    """Send vertical menu using Generic Template"""
+    msg = {
+        "attachment": {
+            "type": "template",
+            "payload": {
+                "template_type": "generic",
+                "elements": [
+                    {
+                        "title": "📋 View Menu",
+                        "subtitle": "See all our dishes and prices",
+                        "buttons": [{"type": "postback", "title": "Open Menu", "payload": "Q_VIEW_MENU"}]
+                    },
+                    {
+                        "title": "🛵 Order on Foodpanda",
+                        "subtitle": "Order online via Foodpanda",
+                        "buttons": [{"type": "web_url", "title": "Open Foodpanda", "url": FOODPANDA_URL}]
+                    },
+                    {
+                        "title": "🍴 Advance Order",
+                        "subtitle": "Schedule your order in advance",
+                        "buttons": [{"type": "postback", "title": "Order Ahead", "payload": "Q_ADVANCE_ORDER"}]
+                    },
+                    {
+                        "title": "📞 Contact Us",
+                        "subtitle": f"Reach us at {PHONE_NUMBER}",
+                        "buttons": [{"type": "postback", "title": "Call Us", "payload": "Q_CONTACT"}]
+                    },
+                ]
+            }
+        }
+    }
+    return call_send_api(psid, msg)
+
+def call_send_api(psid, message_data):
+    """Send message via Messenger Send API"""
     url = f"{FB_GRAPH}/me/messages"
     payload = {
         "recipient": {"id": psid},
         "messaging_type": "RESPONSE",
-        "message": {"text": message},
+        "message": message_data
     }
     params = {"access_token": PAGE_ACCESS_TOKEN}
     try:
         r = requests.post(url, json=payload, params=params, timeout=20)
         r.raise_for_status()
-        logger.info(f"✅ Sent message to {psid}: {message}")
+        logger.info(f"✅ Sent vertical menu to PSID {psid}")
         return r.json()
     except requests.exceptions.RequestException as e:
         logger.error(f"❌ Send API error: {e}")
@@ -51,14 +89,12 @@ def verify():
     mode = request.args.get("hub.mode", "")
     token = request.args.get("hub.verify_token", "")
     challenge = request.args.get("hub.challenge", "")
-
     logger.info(f"Webhook verification attempt: mode={mode}, token={token}")
+
     if mode == "subscribe" and token == VERIFY_TOKEN:
         logger.info("✅ Verification successful")
         return Response(challenge, status=200, mimetype="text/plain")
-    else:
-        logger.warning("❌ Verification failed")
-        return Response("Forbidden", status=403)
+    return Response("Forbidden", status=403)
 
 # ---------------------
 # Webhook POST
@@ -71,24 +107,15 @@ def webhook():
     if data.get("object") == "page":
         for entry in data.get("entry", []):
             for event in entry.get("messaging", []):
-                sender_id = event.get("sender", {}).get("id")
-                if not sender_id:
+                psid = event.get("sender", {}).get("id")
+                if not psid:
                     continue
 
-                # Log the PSID
-                logger.info(f"👤 Sender PSID: {sender_id}")
+                logger.info(f"👤 Sender PSID: {psid}")
 
-                # Handle messages
-                if "message" in event and "text" in event["message"]:
-                    text = event["message"]["text"]
-                    logger.info(f"💬 Received message: {text}")
-                    send_text_message(sender_id, f"You said: {text}")
-
-                # Handle postbacks
-                elif "postback" in event:
-                    payload = event["postback"].get("payload")
-                    logger.info(f"🔘 Received postback: {payload}")
-                    send_text_message(sender_id, f"Postback received: {payload}")
+                # Send vertical menu for any message or GET_STARTED postback
+                if "message" in event or ("postback" in event and event["postback"].get("payload") == "GET_STARTED"):
+                    send_vertical_menu(psid)
 
     return Response("EVENT_RECEIVED", status=200)
 
