@@ -1,34 +1,38 @@
-# app.py
-# Facebook Messenger bot in Python (Flask) with Vertical Menu (Generic Template)
-
+# app_render.py
 import os
 import json
 import argparse
+import logging
 from flask import Flask, request
 import requests
 
+# ---------------------
+# Flask App Setup
+# ---------------------
 app = Flask(__name__)
+
+# Logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # ---------------------
 # Tokens (replace with yours)
 # ---------------------
-PAGE_ACCESS_TOKEN = "EAHJTYAULctYBPe37SSCqNIMZBza7SMCTwoeSqONANotPuvSQKhFrvI6vVWZBoMjaCeb7GdRRwZBvDx4ySl0olQoRPNA67R6t40kaAZAE98w7ehBJXAMyhcSMV3ZACsP0QaMtlzXVWi90Ut7XEgZBLq6hSjv63rZBXpZCpmb2INaGwtnlXZChZCFc7aVZC5WNvI5Pzbnu4KxNu35hgZDZD"
+PAGE_ACCESS_TOKEN = "YOUR_PAGE_ACCESS_TOKEN"
 VERIFY_TOKEN = "123darcscar"
 
 # ---------------------
 # Config
 # ---------------------
 FOODPANDA_URL = "https://www.foodpanda.ph/restaurant/locg/pedros-old-manila-rd"
-MENU_URL = "https://darcscar.github.io/menu.pdf"   # <--- put your menu photo/PDF URL here
+MENU_URL = "https://darcscar.github.io/menu.pdf"
 PHONE_NUMBER = "0424215968"
 PAGE_NAME = "Pedro's Classic and Asian Cuisine"
-
 FB_GRAPH = "https://graph.facebook.com/v19.0"
 
 # ---------------------
 # Helpers
 # ---------------------
-
 def call_send_api(psid, message_data):
     """Send message to user via Send API"""
     url = f"{FB_GRAPH}/me/messages"
@@ -38,110 +42,29 @@ def call_send_api(psid, message_data):
         "messaging_type": "RESPONSE",
         "message": message_data,
     }
-    r = requests.post(url, params=params, json=payload, timeout=20)
-    if r.status_code >= 300:
-        app.logger.error("Send API error %s: %s", r.status_code, r.text)
-    return r.json() if r.text else {}
+    try:
+        r = requests.post(url, params=params, json=payload, timeout=20)
+        r.raise_for_status()
+        logger.debug("Message sent: %s", payload)
+        return r.json()
+    except requests.exceptions.RequestException as e:
+        logger.error("Send API error: %s", e)
+        return None
 
 # ---------------------
-# Vertical Menu
+# Menu Messages
 # ---------------------
-
 def send_vertical_menu(psid):
-    """Sends a vertical-style menu using Messenger Generic Template"""
     msg = {
         "attachment": {
             "type": "template",
             "payload": {
                 "template_type": "generic",
                 "elements": [
-                    {
-                        "title": "📋 View Menu",
-                        "subtitle": "See all our dishes and prices",
-                        "buttons": [
-                            {"type": "postback", "title": "Open Menu", "payload": "Q_VIEW_MENU"}
-                        ],
-                    },
-                    {
-                        "title": "🛵 Order on Foodpanda",
-                        "subtitle": "Order online via Foodpanda",
-                        "buttons": [
-                            {"type": "web_url", "title": "Open Foodpanda", "url": FOODPANDA_URL}
-                        ],
-                    },
-                    {
-                        "title": "🍴 Advance Order",
-                        "subtitle": "Schedule your order in advance",
-                        "buttons": [
-                            {"type": "postback", "title": "Order Ahead", "payload": "Q_ADVANCE_ORDER"}
-                        ],
-                    },
-                    {
-                        "title": "📞 Contact Us",
-                        "subtitle": f"Reach us at {PHONE_NUMBER}",
-                        "buttons": [
-                            {"type": "postback", "title": "Call Us", "payload": "Q_CONTACT"}
-                        ],
-                    },
-                ]
-            }
-        }
-    }
-    return call_send_api(psid, msg)
-
-# ---------------------
-# Other Messages
-# ---------------------
-
-def send_foodpanda_buttons(psid):
-    msg = {
-        "attachment": {
-            "type": "template",
-            "payload": {
-                "template_type": "button",
-                "text": "Order through Foodpanda here:",
-                "buttons": [
-                    {
-                        "type": "web_url",
-                        "url": "https://tinyurl.com/bdhczune",
-                        "title": "🛵 Open Foodpanda",
-                        "webview_height_ratio": "tall",
-                    }
-                ],
-            },
-        }
-    }
-    return call_send_api(psid, msg)
-
-def send_advance_order_info(psid):
-    text = (
-        "✅ Yes, we accept advance orders!\n\n"
-        "• For Foodpanda: schedule inside the Foodpanda app.\n"
-        "• For dine-in/pickup: reply with your order and preferred time here.\n\n"
-        "We’ll have it ready fresh when you arrive. 🕑✨"
-    )
-    call_send_api(psid, {"text": text})
-    return send_vertical_menu(psid)
-
-def send_contact_info(psid):
-    text = f"📞 You can reach us at {PHONE_NUMBER}.\nOr just reply here and a staff member will assist you."
-    call_send_api(psid, {"text": text})
-    return send_vertical_menu(psid)
-
-def send_menu(psid):
-    msg = {
-        "attachment": {
-            "type": "template",
-            "payload": {
-                "template_type": "button",
-                "text": "📋 Here’s our full menu:",
-                "buttons": [
-                    {
-                        "type": "web_url",
-                        "url": "https://imgur.com/a/byqpSBq",
-                        "title": "📖 Open Menu",
-                        "webview_height_ratio": "full"
-                    }
+                    {"title": "📋 View Menu", "subtitle": "See all dishes", "buttons": [{"type": "postback", "title": "Open Menu", "payload": "Q_VIEW_MENU"}]},
+                    {"title": "🛵 Order on Foodpanda", "subtitle": "Order online", "buttons": [{"type": "web_url", "title": "Open Foodpanda", "url": FOODPANDA_URL}]},
+                    {"title": "🍴 Advance Order", "subtitle": "Schedule in advance", "buttons": [{"type": "postback", "title": "Order Ahead", "payload": "Q_ADVANCE_ORDER"}]},
+                    {"title": "📞 Contact Us", "subtitle": f"Reach us at {PHONE_NUMBER}", "buttons": [{"type": "postback", "title": "Call Us", "payload": "Q_CONTACT"}]},
                 ]
             }
         }
@@ -151,12 +74,12 @@ def send_menu(psid):
 # ---------------------
 # Webhook
 # ---------------------
-
 @app.route("/webhook", methods=["GET"])
 def verify():
     mode = request.args.get("hub.mode")
     token = request.args.get("hub.verify_token")
     challenge = request.args.get("hub.challenge")
+    logger.info("Webhook verification attempt: mode=%s, token=%s", mode, token)
 
     if mode == "subscribe" and token == VERIFY_TOKEN:
         return challenge, 200
@@ -164,86 +87,34 @@ def verify():
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    logger.info("Webhook hit!")
     data = request.get_json()
-    app.logger.debug("Incoming: %s", json.dumps(data))
+    logger.debug("Incoming webhook data: %s", json.dumps(data, indent=2))
 
     if data.get("object") == "page":
         for entry in data.get("entry", []):
             for event in entry.get("messaging", []):
                 psid = event.get("sender", {}).get("id")
-                if "message" in event:
-                    msg = event["message"]
-                    if msg.get("quick_reply"):
-                        handle_payload(psid, msg["quick_reply"].get("payload"))
-                    elif "text" in msg:
+                if psid:
+                    if "message" in event:
                         send_vertical_menu(psid)
-                elif "postback" in event:
-                    payload = event["postback"].get("payload")
-                    if payload == "GET_STARTED":
+                    elif "postback" in event:
+                        payload = event["postback"].get("payload")
                         send_vertical_menu(psid)
-                    else:
-                        handle_payload(psid, payload)
     return "EVENT_RECEIVED", 200
-
-# ---------------------
-# Payload Routing
-# ---------------------
-
-def handle_payload(psid, payload):
-    if not payload:
-        return send_vertical_menu(psid)
-    if payload in {"Q_VIEW_MENU", "P_VIEW_MENU"}:
-        return send_menu(psid)
-    if payload in {"Q_FOODPANDA", "P_FOODPANDA"}:
-        return send_foodpanda_buttons(psid)
-    if payload in {"Q_ADVANCE_ORDER", "P_ADVANCE_ORDER"}:
-        return send_advance_order_info(psid)
-    if payload in {"Q_CONTACT", "P_CONTACT"}:
-        return send_contact_info(psid)
-    return send_vertical_menu(psid)
-
-# ---------------------
-# Profile Setup
-# ---------------------
-
-def setup_profile():
-    headers = {"Content-Type": "application/json"}
-    params = {"access_token": PAGE_ACCESS_TOKEN}
-
-    # Get Started button
-    payload = {"get_started": {"payload": "GET_STARTED"}}
-    r = requests.post(f"{FB_GRAPH}/me/messenger_profile", params=params, headers=headers, json=payload, timeout=20)
-    print("Get Started:", r.status_code, r.text)
-
-    # Persistent Menu
-    menu = {
-        "persistent_menu": [
-            {
-                "locale": "default",
-                "composer_input_disabled": False,
-                "call_to_actions": [
-                    {"type": "postback", "title": "📋 View Menu", "payload": "P_VIEW_MENU"},
-                    {"type": "web_url", "title": "🛵 Order on Foodpanda", "url": FOODPANDA_URL, "webview_height_ratio": "tall"},
-                    {"type": "postback", "title": "🍴 Advance Order", "payload": "P_ADVANCE_ORDER"},
-                    {"type": "postback", "title": "📞 Contact Us", "payload": "P_CONTACT"},
-                ],
-            }
-        ]
-    }
-    r2 = requests.post(f"{FB_GRAPH}/me/messenger_profile", params=params, headers=headers, json=menu, timeout=20)
-    print("Persistent Menu:", r2.status_code, r2.text)
 
 # ---------------------
 # Run App
 # ---------------------
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--setup", action="store_true", help="Run Messenger Profile setup and exit")
-    parser.add_argument("--port", default=os.getenv("PORT", "8080"))
     args = parser.parse_args()
 
+    PORT = int(os.getenv("PORT", 10000))  # Use Render-assigned port
+    logger.info("Starting Flask app on port %s", PORT)
+
     if args.setup:
-        setup_profile()
+        print("Setup mode not implemented here.")
     else:
-        app.run(host="0.0.0.0", port=int(args.port))
+        app.run(host="0.0.0.0", port=PORT)
