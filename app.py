@@ -87,20 +87,38 @@ def verify():
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    logger.info("Webhook hit!")
     data = request.get_json()
-    logger.debug("Incoming webhook data: %s", json.dumps(data, indent=2))
+    app.logger.debug("Incoming: %s", json.dumps(data, indent=2))
 
     if data.get("object") == "page":
         for entry in data.get("entry", []):
             for event in entry.get("messaging", []):
                 psid = event.get("sender", {}).get("id")
-                if psid:
-                    if "message" in event:
+                if not psid:
+                    continue
+
+                # Log the PSID of any new user
+                app.logger.info(f"New user PSID: {psid}")
+
+                # Handle messages
+                if "message" in event:
+                    msg = event["message"]
+                    if msg.get("quick_reply"):
+                        handle_payload(psid, msg["quick_reply"].get("payload"))
+                    elif "text" in msg:
+                        # Auto-respond to first message
                         send_vertical_menu(psid)
-                    elif "postback" in event:
-                        payload = event["postback"].get("payload")
+                        app.logger.info(f"Sent vertical menu to PSID {psid}")
+
+                # Handle postbacks (like GET_STARTED)
+                elif "postback" in event:
+                    payload = event["postback"].get("payload")
+                    app.logger.info(f"Received postback {payload} from PSID {psid}")
+                    if payload == "GET_STARTED":
                         send_vertical_menu(psid)
+                        app.logger.info(f"Sent vertical menu to PSID {psid}")
+                    else:
+                        handle_payload(psid, payload)
     return "EVENT_RECEIVED", 200
 
 # ---------------------
