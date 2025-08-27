@@ -12,7 +12,7 @@ app = Flask(__name__)
 # ---------------------
 # Tokens (replace with yours)
 # ---------------------
-PAGE_ACCESS_TOKEN = "EAAPUTGXVbPcBPTSItwjWd91fMOjUG55JrSlgfXtUiNcVpnnA4c0olY70GFRjrPKL9L2vY4R0C0mXvdeXg5V361ZC2fVE48HlRoNvpTek7NPc3VFH4nrpxQWfDejoQkXT5L7DtJeuqdyywrlooerZAshU0EvkXdaORLdjYYCUumS4WIgZA48euntgEYgYbYLh6WkO2LrZB7nEE23mgRI8bgZDZD"
+PAGE_ACCESS_TOKEN = "EAHJTYAULctYBPe37SSCqNIMZBza7SMCTwoeSqONANotPuvSQKhFrvI6vVWZBoMjaCeb7GdRRwZBvDx4ySl0olQoRPNA67R6t40kaAZAE98w7ehBJXAMyhcSMV3ZACsP0QaMtlzXVWi90Ut7XEgZBLq6hSjv63rZBXpZCpmb2INaGwtnlXZChZCFc7aVZC5WNvI5Pzbnu4KxNu35hgZDZD"
 VERIFY_TOKEN = "123darcscar"
 
 # ---------------------
