@@ -124,7 +124,7 @@ def send_advance_order_info(psid):
     return send_vertical_menu(psid)
 
 def send_contact_info(psid):
-    text = f"📞 You can reach us at {0424215968}.\nOr just reply here and a staff member will assist you."
+    text = f"📞 You can reach us at {PHONE_NUMBER}.\nOr just reply here and a staff member will assist you."
     call_send_api(psid, {"text": text})
     return send_vertical_menu(psid)
 
