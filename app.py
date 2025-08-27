@@ -1,4 +1,3 @@
-# webhook.py
 import os
 import json
 import logging
@@ -10,165 +9,93 @@ import requests
 # ---------------------
 app = Flask(__name__)
 
-# Logging setup
+# ---------------------
+# Logging
+# ---------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ---------------------
-# Tokens
+# Facebook Tokens
 # ---------------------
 PAGE_ACCESS_TOKEN = "EAHJTYAULctYBPcUwWzuDz7NrbC9gyFREogcTnAWoKuECFQTab4GcvnJWk0n0weADKloft2rFXVl6VvZA5tAH6wH9mZCZB2QUzaSznXBOvOZCBAqh2k2ut2ERo151Y18dSH9dt9Hgx7ETIThFtyLO9HmTiVHRbZAMCDdh18idUe6Uhm18WgIw4WuilbpJVQSpaqe3zEfzFtwZDZD"
 VERIFY_TOKEN = "123darcscar"
-
-# ---------------------
-# Config
-# ---------------------
-FOODPANDA_URL = "https://www.foodpanda.ph/restaurant/locg/pedros-old-manila-rd"
-MENU_URL = "https://darcscar.github.io/menu.pdf"
-PHONE_NUMBER = "0424215968"
-PAGE_NAME = "Pedro's Classic and Asian Cuisine"
 FB_GRAPH = "https://graph.facebook.com/v19.0"
 
 # ---------------------
 # Helpers
 # ---------------------
-def call_send_api(psid, message_data):
-    """Send a message to a user via Send API."""
+def send_text_message(psid, message):
+    """Send a simple text message to the user"""
     url = f"{FB_GRAPH}/me/messages"
-    params = {"access_token": PAGE_ACCESS_TOKEN}
     payload = {
         "recipient": {"id": psid},
         "messaging_type": "RESPONSE",
-        "message": message_data,
+        "message": {"text": message},
     }
+    params = {"access_token": PAGE_ACCESS_TOKEN}
     try:
-        r = requests.post(url, params=params, json=payload, timeout=20)
+        r = requests.post(url, json=payload, params=params, timeout=20)
         r.raise_for_status()
-        logger.info(f"Sent message to PSID {psid}: {message_data}")
+        logger.info(f"✅ Sent message to {psid}: {message}")
         return r.json()
     except requests.exceptions.RequestException as e:
-        logger.error(f"Send API error: {e}")
+        logger.error(f"❌ Send API error: {e}")
         return None
 
 # ---------------------
-# Menu Messages
+# Webhook Verification
 # ---------------------
-def send_vertical_menu(psid):
-    """Sends a vertical menu using Generic Template."""
-    msg = {
-        "attachment": {
-            "type": "template",
-            "payload": {
-                "template_type": "generic",
-                "elements": [
-                    {
-                        "title": "📋 View Menu",
-                        "subtitle": "See all dishes",
-                        "buttons": [{"type": "postback", "title": "Open Menu", "payload": "Q_VIEW_MENU"}],
-                    },
-                    {
-                        "title": "🛵 Order on Foodpanda",
-                        "subtitle": "Order online",
-                        "buttons": [{"type": "web_url", "title": "Open Foodpanda", "url": FOODPANDA_URL}],
-                    },
-                    {
-                        "title": "🍴 Advance Order",
-                        "subtitle": "Schedule in advance",
-                        "buttons": [{"type": "postback", "title": "Order Ahead", "payload": "Q_ADVANCE_ORDER"}],
-                    },
-                    {
-                        "title": "📞 Contact Us",
-                        "subtitle": f"Reach us at {PHONE_NUMBER}",
-                        "buttons": [{"type": "postback", "title": "Call Us", "payload": "Q_CONTACT"}],
-                    },
-                ]
-            }
-        }
-    }
-    return call_send_api(psid, msg)
+@app.route("/webhook", methods=["GET"])
+def verify():
+    mode = request.args.get("hub.mode", "")
+    token = request.args.get("hub.verify_token", "")
+    challenge = request.args.get("hub.challenge", "")
 
-def send_menu(psid):
-    msg = {
-        "attachment": {
-            "type": "template",
-            "payload": {
-                "template_type": "button",
-                "text": "📋 Here’s our full menu:",
-                "buttons": [{"type": "web_url", "title": "Open Menu", "url": MENU_URL}],
-            },
-        }
-    }
-    return call_send_api(psid, msg)
-
-def send_contact_info(psid):
-    text = f"📞 Contact us at {PHONE_NUMBER}."
-    return call_send_api(psid, {"text": text})
-
-def send_advance_order_info(psid):
-    text = (
-        "✅ We accept advance orders!\n\n"
-        "• Foodpanda: schedule inside the app.\n"
-        "• Dine-in/Pickup: reply with your order and preferred time."
-    )
-    return call_send_api(psid, {"text": text})
-
-# ---------------------
-# Payload Router
-# ---------------------
-def handle_payload(psid, payload):
-    if payload in {"Q_VIEW_MENU", "P_VIEW_MENU"}:
-        send_menu(psid)
-    elif payload in {"Q_FOODPANDA", "P_FOODPANDA"}:
-        call_send_api(psid, {"text": f"Order here: {FOODPANDA_URL}"})
-    elif payload in {"Q_ADVANCE_ORDER", "P_ADVANCE_ORDER"}:
-        send_advance_order_info(psid)
-    elif payload in {"Q_CONTACT", "P_CONTACT"}:
-        send_contact_info(psid)
+    logger.info(f"Webhook verification attempt: mode={mode}, token={token}")
+    if mode == "subscribe" and token == VERIFY_TOKEN:
+        logger.info("✅ Verification successful")
+        return Response(challenge, status=200, mimetype="text/plain")
     else:
-        send_vertical_menu(psid)
-
-# ---------------------
-# Webhook Routes
-# ---------------------
-@app.route("/webhook", methods=["GET", "POST"])
-def webhook():
-    if request.method == "GET":
-        mode = request.args.get("hub.mode", "")
-        token = request.args.get("hub.verify_token", "")
-        challenge = request.args.get("hub.challenge", "")
-        logger.info(f"Webhook verification request: mode={mode}, token={token}, challenge={challenge}")
-
-        if mode == "subscribe" and token == VERIFY_TOKEN:
-            return Response(challenge, status=200, mimetype="text/plain")
+        logger.warning("❌ Verification failed")
         return Response("Forbidden", status=403)
 
-    if request.method == "POST":
-        data = request.get_json()
-        logger.info(f"Incoming webhook event: {json.dumps(data, indent=2)}")
+# ---------------------
+# Webhook POST
+# ---------------------
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    data = request.get_json()
+    logger.info(f"📩 Incoming webhook: {json.dumps(data, indent=2)}")
 
-        if data.get("object") == "page":
-            for entry in data.get("entry", []):
-                for event in entry.get("messaging", []):
-                    psid = event.get("sender", {}).get("id")
-                    if not psid:
-                        continue
-                    logger.info(f"User PSID: {psid}")
+    if data.get("object") == "page":
+        for entry in data.get("entry", []):
+            for event in entry.get("messaging", []):
+                sender_id = event.get("sender", {}).get("id")
+                if not sender_id:
+                    continue
 
-                    if "message" in event:
-                        msg = event["message"]
-                        if msg.get("quick_reply"):
-                            handle_payload(psid, msg["quick_reply"].get("payload"))
-                        elif "text" in msg:
-                            send_vertical_menu(psid)
-                    elif "postback" in event:
-                        payload = event["postback"].get("payload")
-                        handle_payload(psid, payload)
-        return Response("EVENT_RECEIVED", status=200)
+                # Log the PSID
+                logger.info(f"👤 Sender PSID: {sender_id}")
+
+                # Handle messages
+                if "message" in event and "text" in event["message"]:
+                    text = event["message"]["text"]
+                    logger.info(f"💬 Received message: {text}")
+                    send_text_message(sender_id, f"You said: {text}")
+
+                # Handle postbacks
+                elif "postback" in event:
+                    payload = event["postback"].get("payload")
+                    logger.info(f"🔘 Received postback: {payload}")
+                    send_text_message(sender_id, f"Postback received: {payload}")
+
+    return Response("EVENT_RECEIVED", status=200)
 
 # ---------------------
-# Run App
+# Run Flask App
 # ---------------------
 if __name__ == "__main__":
     PORT = int(os.getenv("PORT", 10000))
-    logger.info(f"Starting Flask app on port {PORT}")
+    logger.info(f"🚀 Starting Flask app on port {PORT}")
     app.run(host="0.0.0.0", port=PORT, debug=True)
